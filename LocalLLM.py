@@ -7,7 +7,7 @@ OLLAMA_URL = os.getenv("OLLAMA_URL")
 
 class LocalLLM:
   def __init__(self, model=None):
-    self.model = model or os.getenv("OLLAMA_MODEL", "llama3")
+    self.model = model or os.getenv("OLLAMA_MODEL", "qwen3.5:9b")
     
   def _query(self, prompt, system=None):
     payload = {
