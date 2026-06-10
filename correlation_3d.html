@@ -1,0 +1,289 @@
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Korelacja dynamiki uczestnika — XAI-FUNGI</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d1219; --panel:#161f2c; --panel-2:#1b2433;
+    --panel-hi:#1d2838; --line:#2a3848; --line-soft:#212e3c;
+    --ink:#e9eef4; --muted:#8593a4; --faint:#5d6b7c;
+    --amber:#f4c20d; --amber-dim:#caa00a;
+    --de:#e4572e; --it:#37a6cf; --ssh:#a06bff;
+    --display:'Space Grotesk',sans-serif; --mono:'IBM Plex Mono',monospace; --body:'IBM Plex Sans',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body)}
+  body{-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+
+  .wrap{max-width:1240px;margin:0 auto;padding:32px 28px 48px}
+
+  /* header */
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--amber);display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .eyebrow::before{content:"";width:26px;height:1px;background:var(--amber);display:inline-block}
+  h1{font-family:var(--display);font-weight:600;font-size:clamp(28px,4vw,44px);line-height:1.04;
+    margin:0 0 14px;letter-spacing:-.02em}
+  h1 .accent{color:var(--muted);font-weight:400}
+  .lede{color:var(--muted);max-width:62ch;font-size:15px;line-height:1.6;margin:0}
+  .lede code{font-family:var(--mono);font-size:13px;color:var(--ink);background:var(--panel-hi);
+    padding:1px 6px;border-radius:4px}
+
+  .rule{height:1px;background:var(--line-soft);margin:28px 0}
+
+  /* layout */
+  .grid{display:grid;grid-template-columns:320px 1fr;gap:22px;align-items:start}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+  .card-pad{padding:20px}
+
+  .panel-label{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 14px}
+
+  /* target selector */
+  .sel-wrap{position:relative}
+  select#target{appearance:none;width:100%;background:var(--panel-hi);color:var(--ink);
+    border:1px solid var(--line);border-radius:10px;padding:13px 40px 13px 14px;
+    font-family:var(--mono);font-size:15px;font-weight:500;cursor:pointer;letter-spacing:.02em}
+  select#target:focus{outline:2px solid var(--amber);outline-offset:1px}
+  .sel-wrap::after{content:"";position:absolute;right:16px;top:50%;width:8px;height:8px;
+    border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);
+    transform:translateY(-65%) rotate(45deg);pointer-events:none}
+  .sel-meta{font-family:var(--mono);font-size:12px;color:var(--faint);margin-top:10px;line-height:1.5}
+  .sel-meta b{color:var(--muted);font-weight:500}
+
+  /* legend */
+  .legend{display:flex;flex-direction:column;gap:11px;margin-top:4px}
+  .leg-row{display:flex;align-items:center;gap:11px;font-size:13.5px}
+  .dot{width:11px;height:11px;border-radius:50%;flex:none;box-shadow:0 0 0 3px rgba(255,255,255,.04)}
+  .leg-row .n{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--faint)}
+
+  /* ranking */
+  .rank{display:flex;flex-direction:column}
+  .rank-row{display:grid;grid-template-columns:18px 1fr auto;gap:12px;align-items:center;
+    padding:10px 4px;border-bottom:1px solid var(--line-soft)}
+  .rank-row:last-child{border-bottom:0}
+  .rank-row .idx{font-family:var(--mono);font-size:12px;color:var(--faint);text-align:right}
+  .rank-id{font-family:var(--mono);font-size:13.5px;font-weight:500}
+  .rank-id .grp{font-size:11px;color:var(--faint);margin-left:7px}
+  .rank-val{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:right;min-width:46px}
+  .bar{grid-column:2 / 4;height:3px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:-2px}
+  .bar > i{display:block;height:100%;border-radius:2px}
+
+  /* plot */
+  .plot-card{padding:8px 8px 4px;min-height:560px;position:relative}
+  #plot{width:100%;height:560px}
+  .plot-cap{display:flex;justify-content:space-between;align-items:center;
+    padding:6px 14px 12px;font-family:var(--mono);font-size:11.5px;color:var(--faint);letter-spacing:.04em}
+  .plot-cap .hint{display:flex;align-items:center;gap:7px}
+  .plot-cap .hint svg{opacity:.7}
+
+  /* footer note */
+  .note{margin-top:26px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .note-item{font-size:13px;color:var(--muted);line-height:1.55}
+  .note-item h4{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink);margin:0 0 7px;font-weight:600}
+  .note-item code{font-family:var(--mono);font-size:12px;color:var(--amber)}
+
+  @media (max-width:880px){
+    .grid{grid-template-columns:1fr}
+    .note{grid-template-columns:1fr}
+    #plot,.plot-card{height:auto;min-height:0}
+    #plot{height:440px}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">XAI-FUNGI · profil korelacji</div>
+  <h1>Korelacja dynamiki uczestnika <span class="accent">vs reszta grupy</span></h1>
+  <p class="lede">Każdy uczestnik to przebieg trzech metryk po kolejnych slajdach. Dla wybranej osoby liczymy korelację Pearsona <b>osobno dla każdej metryki</b> po wspólnych slajdach — trzy liczby na parę wyznaczają położenie punktu w przestrzeni. Osoba docelowa stoi w <code>(1, 1, 1)</code>; im bliżej niej, tym bardziej zgodna dynamika reakcji.</p>
+
+  <div class="rule"></div>
+
+  <div class="grid">
+    <!-- SIDEBAR -->
+    <div style="display:flex;flex-direction:column;gap:22px">
+      <div class="card card-pad">
+        <p class="panel-label">Uczestnik docelowy</p>
+        <div class="sel-wrap">
+          <select id="target"></select>
+        </div>
+        <div class="sel-meta" id="selMeta"></div>
+      </div>
+
+      <div class="card card-pad">
+        <p class="panel-label">Grupy</p>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="card card-pad">
+        <p class="panel-label">Najsilniejsza korelacja <span style="text-transform:none;letter-spacing:0">(śr. z 3 metryk)</span></p>
+        <div class="rank" id="rank"></div>
+      </div>
+    </div>
+
+    <!-- PLOT -->
+    <div class="card plot-card">
+      <div id="plot"></div>
+      <div class="plot-cap">
+        <span id="capInfo">—</span>
+        <span class="hint">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>
+          przeciągnij, aby obrócić
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <div class="note-item">
+      <h4>Metoda</h4>
+      Korelacja Pearsona liczona po częściach wspólnych zbiorów slajdów. Minimum <code>4</code> wspólne slajdy, inaczej para jest pomijana.
+    </div>
+    <div class="note-item">
+      <h4>Stała metryka</h4>
+      Gdy metryka nie zmienia się u uczestnika, wariancja wynosi zero i korelacja jest nieokreślona — przyjmujemy wtedy <code>0</code>.
+    </div>
+    <div class="note-item">
+      <h4>Zakres danych</h4>
+      <code id="nInfo">31</code> uczestników z poprawnym profilem. Siedem plików z prefiksem <code>DR_</code> było pustych i zostało odrzuconych.
+    </div>
+  </div>
+</div>
+
+<script>
+const PROFILES = {"MW_IT_06": {"__S00__": [0.7, 0.5, 0.6], "__S1__": [0.9, 0.5, 0.7], "__S2__": [0.7, 0.3, 0.4], "__S3__": [0.85, 0.32, 0.45], "__S4__": [0.9, 0.35, 0.65], "__S5__": [0.82, 0.35, 0.65], "__S6__": [0.85, 0.25, 0.55], "__S7__": [0.85, 0.4, 0.6], "__S8__": [0.85, 0.6, 0.75], "__S9__": [0.9, 0.45, 0.7], "__S10__": [0.78, 0.25, 0.6], "__S11__": [0.85, 0.32, 0.64], "__S12__": [0.75, 0.52, 0.68], "__S13__": [0.85, 0.72, 0.75], "__S14__": [0.65, 0.7, 0.8], "__S15__": [0.75, 0.7, 0.82], "__S88__": [0.85, 0.6, 0.7], "__S99__": [0.8, 0.45, 0.65]}, "MZ_IT_05": {"__S00__": [0.6, 0.4, 0.7], "__S4__": [0.7, 0.4, 0.6], "__S3__": [0.62, 0.58, 0.55], "__S5__": [0.8, 0.75, 0.65], "__S6__": [0.78, 0.25, 0.35], "__S7__": [0.74, 0.32, 0.61], "__S8__": [0.85, 0.62, 0.78], "__S9__": [0.7, 0.45, 0.55], "__S10__": [0.65, 0.3, 0.45], "__S11__": [0.6, 0.8, 0.7], "__S12__": [0.75, 0.35, 0.6], "__S13__": [0.85, 0.65, 0.7], "__S15__": [0.72, 0.68, 0.75], "__S88__": [0.9, 0.35, 0.75], "__S99__": [0.85, 0.65, 0.75]}, "MW_SSH_01": {"__S00__": [0.65, 0.72, 0.81], "__S1__": [0.85, 0.75, 0.8], "__S4__": [0.92, 0.85, 0.88], "__S5__": [0.85, 0.7, 0.9], "__S6__": [0.9, 0.45, 0.65], "__S7__": [0.85, 0.7, 0.75], "__S8__": [0.85, 0.6, 0.75], "__S9__": [0.85, 0.78, 0.82], "__S10__": [0.88, 0.75, 0.85], "__S11__": [0.9, 0.8, 0.85], "__S12__": [0.85, 0.65, 0.7], "__S13__": [0.9, 0.75, 0.85], "__S14__": [0.8, 0.45, 0.75], "__S15__": [0.72, 0.68, 0.75], "__S99__": [0.85, 0.79, 0.82], "__S88__": [0.88, 0.42, 0.85]}, "MZ_SSH_04": {"__S00__": [0.75, 0.85, 0.6], "__S4__": [0.7, 0.5, 0.6], "__S5__": [0.9, 0.92, 0.85], "__S6__": [0.65, 0.45, 0.65], "__S7__": [0.76, 0.45, 0.79], "__S8__": [0.75, 0.55, 0.68], "__S9__": [0.82, 0.68, 0.74], "__S10__": [0.72, 0.35, 0.68], "__S12__": [0.6, 0.2, 0.35], "__S13__": [0.85, 0.6, 0.7], "__S15__": [0.78, 0.65, 0.82], "__S88__": [0.85, 0.35, 0.65], "__S99__": [0.92, 0.85, 0.88]}, "MW_IT_02": {"__S00__": [0.8, 0.65, 0.75], "__S1__": [0.85, 0.6, 0.75], "__S4__": [0.7, 0.35, 0.55], "__S5__": [0.65, 0.75, 0.8], "__S6__": [0.85, 0.85, 0.75], "__S7__": [0.88, 0.65, 0.72], "__S8__": [0.85, 0.2, 0.6], "__S9__": [0.85, 0.75, 0.85], "__S10__": [0.75, 0.35, 0.65], "__S11__": [0.85, 0.92, 0.78], "__S12__": [0.9, 0.7, 0.85], "__S13__": [0.85, 0.6, 0.78], "__S14__": [0.6, 0.3, 0.4], "__S15__": [0.65, 0.72, 0.58], "__S99__": [0.85, 0.7, 0.85], "__S88__": [0.85, 0.35, 0.65]}, "PK_DE_11-12": {"__S00__": [0.82, 0.85, 0.8], "__S1__": [0.7, 0.3, 0.4], "__S2__": [0.6, 0.55, 0.6], "__S3__": [0.45, 0.85, 0.65], "__S4__": [0.85, 0.75, 0.8], "__S5__": [0.9, 0.85, 0.8], "__S6__": [0.75, 0.65, 0.7], "__S7__": [0.85, 0.68, 0.74], "__S8__": [0.9, 0.75, 0.85], "__S9__": [0.95, 0.85, 0.8], "__S10__": [0.88, 0.79, 0.85], "__S11__": [0.3, 0.4, 0.5], "__S12__": [0.85, 0.45, 0.75], "__S13__": [0.85, 0.7, 0.85], "__S14__": [0.85, 0.9, 0.8], "__S15__": [0.5, 0.5, 0.5], "__S99__": [0.85, 0.9, 0.82]}, "PK_DE_13": {"__S00__": [0.85, 0.95, 0.8], "__S1__": [0.6, 0.35, 0.55], "__S2__": [0.72, 0.85, 0.65], "__S3__": [0.8, 0.55, 0.7], "__S4__": [0.85, 0.45, 0.75], "__S5__": [0.9, 0.6, 0.85], "__S6__": [0.85, 0.75, 0.65], "__S7__": [0.8, 0.25, 0.45], "__S8__": [0.8, 0.3, 0.75], "__S9__": [0.85, 0.65, 0.75], "__S10__": [0.88, 0.75, 0.9], "__S12__": [0.8, 0.25, 0.65], "__S14__": [0.85, 0.25, 0.72], "__S15__": [0.75, 0.8, 0.65], "__S99__": [0.85, 0.5, 0.75]}, "MZ_SSH_03": {"__S00__": [0.8, 0.5, 0.6], "__S4__": [0.75, 0.25, 0.6], "__S5__": [0.75, 0.35, 0.55], "__S6__": [0.82, 0.45, 0.6], "__S7__": [0.75, 0.45, 0.6], "__S8__": [0.75, 0.3, 0.4], "__S9__": [0.85, 0.45, 0.6], "__S10__": [0.7, 0.3, 0.5], "__S11__": [0.78, 0.35, 0.62], "__S12__": [0.75, 0.35, 0.4], "__S13__": [0.8, 0.5, 0.6], "__S15__": [0.72, 0.85, 0.68], "__S88__": [0.75, 0.3, 0.4], "__S99__": [0.75, 0.3, 0.35]}, "MK_IT_03": {"__S00__": [0.6, 0.8, 0.6], "__S1__": [0.9, 0.8, 0.7], "__S2__": [0.65, 0.4, 0.7], "__S3__": [0.85, 0.75, 0.75], "__S4__": [0.85, 0.55, 0.78], "__S5__": [0.9, 0.85, 0.78], "__S6__": [0.85, 0.45, 0.68], "__S7__": [0.7, 0.3, 0.5], "__S8__": [0.84, 0.32, 0.62], "__S9__": [0.75, 0.35, 0.6], "__S10__": [0.65, 0.45, 0.7], "__S11__": [0.85, 0.3, 0.7], "__S13__": [0.85, 0.82, 0.72], "__S14__": [0.85, 0.75, 0.72], "__S15__": [0.5, 0.5, 0.5], "__S88__": [0.85, 0.42, 0.61], "__S99__": [0.85, 0.48, 0.72]}, "MW_SSH_04": {"__S00__": [0.85, 0.65, 0.75], "__S1__": [0.85, 0.78, 0.82], "__S2__": [0.7, 0.3, 0.65], "__S3__": [0.9, 0.7, 0.85], "__S4__": [0.9, 0.75, 0.85], "__S5__": [0.9, 0.85, 0.8], "__S6__": [0.88, 0.52, 0.61], "__S7__": [0.85, 0.7, 0.9], "__S8__": [0.85, 0.62, 0.75], "__S9__": [0.89, 0.72, 0.91], "__S10__": [0.72, 0.35, 0.68], "__S11__": [0.85, 0.75, 0.8], "__S12__": [0.78, 0.62, 0.75], "__S13__": [0.85, 0.75, 0.8], "__S14__": [0.92, 0.65, 0.78], "__S15__": [0.65, 0.72, 0.68], "__S99__": [0.85, 0.42, 0.63], "__S88__": [0.72, 0.41, 0.83]}, "MZ_SSH_07": {"__S00__": [0.85, 0.72, 0.78], "__S1__": [0.85, 0.75, 0.9], "__S2__": [0.45, 0.25, 0.35], "__S3__": [0.8, 0.65, 0.7], "__S4__": [0.65, 0.32, 0.48], "__S5__": [0.75, 0.35, 0.5], "__S6__": [0.85, 0.55, 0.65], "__S7__": [0.75, 0.4, 0.6], "__S8__": [0.35, 0.18, 0.62], "__S9__": [0.85, 0.62, 0.78], "__S10__": [0.68, 0.45, 0.62], "__S11__": [0.9, 0.85, 0.8], "__S12__": [0.6, 0.3, 0.4], "__S13__": [0.85, 0.65, 0.75], "__S14__": [0.75, 0.6, 0.55], "__S15__": [0.78, 0.65, 0.72], "__S88__": [0.82, 0.35, 0.45], "__S99__": [0.85, 0.72, 0.68]}, "MZ_IT_06": {"__S00__": [0.65, 0.35, 0.45], "__S1__": [0.85, 0.72, 0.75], "__S2__": [0.7, 0.65, 0.6], "__S3__": [0.85, 0.72, 0.88], "__S4__": [0.85, 0.62, 0.7], "__S5__": [0.65, 0.4, 0.38], "__S6__": [0.85, 0.6, 0.7], "__S7__": [0.78, 0.42, 0.63], "__S8__": [0.85, 0.65, 0.9], "__S9__": [0.95, 0.7, 0.8], "__S10__": [0.85, 0.45, 0.6], "__S11__": [0.85, 0.75, 0.6], "__S12__": [0.65, 0.35, 0.45], "__S13__": [0.9, 0.8, 0.65], "__S15__": [0.65, 0.72, 0.81], "__S88__": [0.82, 0.48, 0.71]}, "PK_DE_05": {"__S00__": [0.82, 0.94, 0.71], "__S1__": [0.85, 0.7, 0.65], "__S2__": [0.85, 0.95, 0.9], "__S3__": [0.85, 0.65, 0.9], "__S4__": [0.85, 0.6, 0.55], "__S5__": [0.9, 0.75, 0.85], "__S6__": [0.9, 0.75, 0.65], "__S7__": [0.75, 0.3, 0.7], "__S8__": [0.82, 0.61, 0.74], "__S10__": [0.65, 0.35, 0.4], "__S11__": [0.85, 0.62, 0.78], "__S12__": [0.82, 0.73, 0.68], "__S13__": [0.85, 0.72, 0.65], "__S15__": [0.75, 0.68, 0.72], "__S99__": [0.85, 0.3, 0.35]}, "MW_SSH_03": {"__S00__": [0.75, 0.8, 0.7], "__S1__": [0.75, 0.95, 0.85], "__S2__": [0.95, 1.0, 0.85], "__S3__": [0.75, 0.25, 0.6], "__S4__": [0.85, 0.45, 0.7], "__S5__": [0.75, 0.45, 0.6], "__S6__": [0.85, 0.62, 0.71], "__S7__": [0.7, 0.8, 0.85], "__S8__": [0.85, 0.72, 0.82], "__S9__": [0.85, 0.65, 0.75], "__S10__": [0.8, 0.4, 0.6], "__S11__": [0.75, 0.4, 0.7], "__S12__": [0.65, 0.3, 0.55], "__S13__": [0.9, 0.85, 0.8], "__S14__": [0.85, 0.92, 0.78], "__S15__": [0.65, 0.7, 0.62], "__S99__": [0.88, 0.65, 0.72], "__S88__": [0.85, 0.45, 0.6]}, "MK_SSH_04": {"__S00__": [0.78, 0.65, 0.72], "__S1__": [0.8, 0.7, 0.65], "__S2__": [0.58, 0.45, 0.62], "__S3__": [0.68, 0.82, 0.71], "__S4__": [0.88, 0.35, 0.72], "__S5__": [0.65, 0.25, 0.6], "__S6__": [0.75, 0.3, 0.6], "__S7__": [0.7, 0.2, 0.65], "__S8__": [0.75, 0.28, 0.35], "__S9__": [0.5, 0.3, 0.6], "__S10__": [0.65, 0.3, 0.5], "__S11__": [0.8, 0.75, 0.6], "__S12__": [0.82, 0.21, 0.39], "__S13__": [0.85, 0.6, 0.75], "__S15__": [0.5, 0.5, 0.5], "__S88__": [0.78, 0.25, 0.65], "__S99__": [0.68, 0.47, 0.72]}, "PK_DE_08": {"__S00__": [0.9, 0.95, 0.85], "__S1__": [0.85, 0.92, 0.78], "__S2__": [0.75, 0.65, 0.8], "__S3__": [0.8, 0.75, 0.65], "__S4__": [0.88, 0.62, 0.74], "__S5__": [0.82, 0.71, 0.64], "__S6__": [0.9, 0.85, 0.75], "__S7__": [0.85, 0.45, 0.5], "__S8__": [0.85, 0.92, 0.76], "__S9__": [0.85, 0.82, 0.78], "__S10__": [0.9, 0.65, 0.7], "__S11__": [0.91, 0.78, 0.82], "__S12__": [0.9, 0.8, 0.75], "__S13__": [0.92, 0.65, 0.7], "__S14__": [0.9, 0.85, 0.75], "__S15__": [0.78, 0.85, 0.72], "__S99__": [0.85, 0.6, 0.72]}, "MK_IT_06": {"__S00__": [0.7, 0.4, 0.55], "__S1__": [0.65, 0.45, 0.7], "__S4__": [0.85, 0.6, 0.75], "__S5__": [0.75, 0.45, 0.65], "__S6__": [0.85, 0.2, 0.45], "__S7__": [0.82, 0.58, 0.76], "__S8__": [0.85, 0.65, 0.75], "__S9__": [0.85, 0.6, 0.7], "__S10__": [0.85, 0.4, 0.55], "__S11__": [0.5, 0.65, 0.35], "__S12__": [0.82, 0.35, 0.68], "__S13__": [0.58, 0.21, 0.35], "__S15__": [0.75, 0.68, 0.82], "__S88__": [0.9, 0.75, 0.8], "__S99__": [0.87, 0.63, 0.71]}, "PK_DE_04": {"__S00__": [0.82, 0.9, 0.85], "__S1__": [0.75, 0.45, 0.65], "__S2__": [0.9, 0.75, 0.85], "__S3__": [0.9, 0.82, 0.85], "__S4__": [0.9, 0.85, 0.9], "__S5__": [0.85, 0.72, 0.81], "__S6__": [0.85, 0.9, 0.85], "__S7__": [0.9, 0.95, 0.85], "__S8__": [0.85, 0.55, 0.75], "__S9__": [0.72, 0.48, 0.65], "__S10__": [0.9, 0.5, 0.7], "__S11__": [0.85, 0.7, 0.8], "__S12__": [0.9, 0.95, 0.85], "__S13__": [0.85, 0.9, 0.7], "__S15__": [0.75, 0.82, 0.7], "__S99__": [0.85, 0.9, 0.85]}, "MW_IT_07": {"__S00__": [0.85, 0.6, 0.75], "__S4__": [0.8, 0.6, 0.75], "__S3__": [0.9, 0.75, 0.85], "__S5__": [0.65, 0.25, 0.45], "__S6__": [0.9, 0.3, 0.5], "__S7__": [0.75, 0.25, 0.35], "__S8__": [0.75, 0.35, 0.6], "__S9__": [0.9, 0.65, 0.8], "__S10__": [0.9, 0.75, 0.8], "__S11__": [0.8, 0.6, 0.45], "__S12__": [0.85, 0.62, 0.7], "__S13__": [0.88, 0.65, 0.7], "__S14__": [0.85, 0.92, 0.78], "__S15__": [0.72, 0.81, 0.65], "__S99__": [0.8, 0.4, 0.6], "__S88__": [0.75, 0.3, 0.8]}, "PK_DE_07": {"__S00__": [0.9, 1.0, 0.85], "__S1__": [0.85, 0.7, 0.9], "__S2__": [0.6, 0.35, 0.5], "__S3__": [0.8, 0.7, 0.6], "__S4__": [0.8, 0.65, 0.75], "__S5__": [0.85, 0.65, 0.7], "__S6__": [0.85, 0.6, 0.75], "__S8__": [0.8, 0.55, 0.7], "__S9__": [0.85, 0.6, 0.75], "__S10__": [0.85, 0.65, 0.82], "__S11__": [0.85, 0.7, 0.8], "__S12__": [0.75, 0.35, 0.6], "__S13__": [0.75, 0.6, 0.6], "__S14__": [0.85, 0.6, 0.72], "__S15__": [0.65, 0.72, 0.58], "__S99__": [0.85, 0.65, 0.7]}, "PK_DE_03": {"__S00__": [0.75, 0.9, 0.85], "__S1__": [0.85, 0.9, 0.75], "__S4__": [0.9, 0.85, 0.75], "__S5__": [0.85, 0.78, 0.75], "__S6__": [0.85, 0.6, 0.65], "__S7__": [0.85, 0.65, 0.75], "__S8__": [0.6, 0.4, 0.5], "__S9__": [0.6, 0.4, 0.5], "__S10__": [0.82, 0.71, 0.59], "__S11__": [0.75, 0.6, 0.65], "__S12__": [0.55, 0.42, 0.38], "__S13__": [0.85, 0.65, 0.65], "__S14__": [0.75, 0.4, 0.5], "__S15__": [0.75, 0.82, 0.68], "__S99__": [0.85, 0.75, 0.6]}, "PK_DE_10": {"__S00__": [0.65, 0.85, 0.72], "__S1__": [0.4, 0.6, 0.5], "__S2__": [0.4, 0.5, 0.3], "__S3__": [0.62, 0.58, 0.65], "__S4__": [0.82, 0.48, 0.58], "__S5__": [0.75, 0.68, 0.82], "__S6__": [0.85, 0.45, 0.7], "__S7__": [0.85, 0.75, 0.82], "__S8__": [0.9, 0.8, 0.75], "__S9__": [0.92, 0.85, 0.89], "__S10__": [0.85, 0.68, 0.82], "__S11__": [0.92, 0.87, 0.65], "__S12__": [0.82, 0.35, 0.78], "__S13__": [0.88, 0.82, 0.9], "__S14__": [0.85, 0.75, 0.65], "__S15__": [0.74, 0.81, 0.69], "__S99__": [0.85, 0.6, 0.75]}, "MZ_SSH_02": {"__S00__": [0.85, 0.91, 0.76], "__S4__": [0.7, 0.4, 0.35], "__S5__": [0.85, 0.65, 0.75], "__S6__": [0.75, 0.3, 0.45], "__S7__": [0.75, 0.3, 0.4], "__S8__": [0.8, 0.5, 0.6], "__S9__": [0.82, 0.58, 0.45], "__S10__": [0.8, 0.25, 0.5], "__S12__": [0.85, 0.45, 0.6], "__S13__": [0.65, 0.35, 0.75], "__S14__": [0.85, 0.6, 0.48], "__S15__": [0.5, 0.5, 0.5], "__S88__": [0.8, 0.45, 0.7], "__S99__": [0.9, 0.75, 0.8]}, "MK_SSH_02": {"__S00__": [0.75, 0.9, 0.8], "__S1__": [0.75, 0.65, 0.6], "__S2__": [0.8, 0.75, 0.7], "__S3__": [0.7, 0.3, 0.4], "__S4__": [0.85, 0.65, 0.9], "__S5__": [0.85, 0.75, 0.8], "__S6__": [0.75, 0.35, 0.6], "__S7__": [0.85, 0.4, 0.55], "__S8__": [0.85, 0.65, 0.7], "__S9__": [0.88, 0.35, 0.62], "__S10__": [0.78, 0.61, 0.65], "__S11__": [0.8, 0.65, 0.75], "__S12__": [0.75, 0.25, 0.4], "__S13__": [0.9, 0.7, 0.85], "__S15__": [0.5, 0.5, 0.5], "__S88__": [0.85, 0.3, 0.4], "__S99__": [0.75, 0.45, 0.65]}, "PK_DE_02": {"__S00__": [0.85, 0.9, 0.8], "__S1__": [0.9, 0.95, 0.85], "__S2__": [0.85, 0.72, 0.76], "__S3__": [0.85, 0.9, 0.82], "__S4__": [0.95, 0.85, 0.9], "__S5__": [0.9, 0.7, 0.85], "__S6__": [0.85, 0.75, 0.78], "__S7__": [0.75, 0.45, 0.8], "__S8__": [0.9, 0.75, 0.7], "__S10__": [0.85, 0.72, 0.8], "__S11__": [0.85, 0.6, 0.7], "__S12__": [0.8, 0.45, 0.6], "__S13__": [0.85, 0.35, 0.75], "__S14__": [0.92, 0.85, 0.78], "__S15__": [0.6, 0.7, 0.5], "__S99__": [0.9, 0.85, 0.9]}, "MW_SSH_05": {"__S00__": [0.85, 0.65, 0.75], "__S1__": [0.65, 0.35, 0.72], "__S2__": [0.4, 0.6, 0.8], "__S3__": [0.82, 0.65, 0.78], "__S4__": [0.87, 0.52, 0.68], "__S5__": [0.78, 0.35, 0.45], "__S6__": [0.75, 0.25, 0.85], "__S7__": [0.8, 0.3, 0.7], "__S8__": [0.85, 0.4, 0.65], "__S9__": [0.7, 0.6, 0.8], "__S10__": [0.82, 0.68, 0.79], "__S11__": [0.72, 0.45, 0.58], "__S12__": [0.8, 0.5, 0.6], "__S13__": [0.85, 0.72, 0.79], "__S15__": [0.65, 0.7, 0.6], "__S99__": [0.9, 0.8, 0.75], "__S88__": [0.8, 0.4, 0.7]}, "MK_SSH_05": {"__S00__": [0.85, 0.9, 0.75], "__S1__": [0.75, 0.82, 0.78], "__S2__": [0.75, 0.8, 0.75], "__S3__": [0.75, 0.9, 0.85], "__S4__": [0.85, 0.7, 0.9], "__S5__": [0.85, 0.6, 0.72], "__S6__": [0.72, 0.42, 0.58], "__S7__": [0.82, 0.45, 0.55], "__S8__": [0.85, 0.82, 0.79], "__S9__": [0.9, 0.76, 0.82], "__S10__": [0.82, 0.61, 0.74], "__S11__": [0.82, 0.64, 0.71], "__S12__": [0.85, 0.6, 0.7], "__S13__": [0.87, 0.62, 0.74], "__S14__": [0.8, 0.65, 0.9], "__S15__": [0.7, 0.6, 0.8], "__S88__": [0.85, 0.6, 0.7], "__S99__": [0.85, 0.75, 0.8]}, "PK_DE_06": {"__S00__": [0.35, 0.88, 0.72], "__S1__": [0.85, 0.75, 0.92], "__S2__": [0.85, 0.3, 0.7], "__S3__": [0.88, 0.74, 0.81], "__S4__": [0.92, 0.75, 0.85], "__S5__": [0.85, 0.65, 0.72], "__S6__": [0.72, 0.48, 0.7], "__S7__": [0.55, 0.3, 0.7], "__S8__": [0.75, 0.4, 0.8], "__S9__": [0.75, 0.9, 0.65], "__S10__": [0.7, 0.85, 0.75], "__S12__": [0.4, 0.25, 0.3], "__S13__": [0.5, 0.3, 0.55], "__S14__": [0.95, 0.9, 0.8], "__S15__": [0.78, 0.85, 0.62], "__S99__": [0.85, 0.65, 0.8]}, "PK_DE_09": {"__S00__": [0.85, 0.55, 0.65], "__S1__": [0.8, 0.25, 0.6], "__S3__": [0.75, 0.65, 0.75], "__S4__": [0.85, 0.45, 0.65], "__S5__": [0.85, 0.35, 0.4], "__S6__": [0.85, 0.45, 0.75], "__S7__": [0.85, 0.35, 0.6], "__S8__": [0.85, 0.68, 0.65], "__S9__": [0.85, 0.88, 0.78], "__S10__": [0.85, 0.6, 0.7], "__S12__": [0.78, 0.5, 0.45], "__S13__": [0.85, 0.52, 0.72], "__S14__": [0.8, 0.45, 0.65], "__S15__": [0.85, 0.92, 0.75], "__S99__": [0.85, 0.82, 0.76]}, "MK_SSH_07": {"__S00__": [0.82, 0.9, 0.85], "__S1__": [0.6, 0.3, 0.5], "__S2__": [0.75, 0.6, 0.68], "__S3__": [0.65, 0.85, 0.75], "__S4__": [0.85, 0.32, 0.65], "__S5__": [0.9, 0.85, 0.85], "__S6__": [0.85, 0.35, 0.5], "__S7__": [0.9, 0.7, 0.85], "__S8__": [0.85, 0.6, 0.7], "__S9__": [0.85, 0.45, 0.65], "__S10__": [0.72, 0.48, 0.75], "__S11__": [0.9, 0.85, 0.75], "__S12__": [0.75, 0.25, 0.6], "__S13__": [0.85, 0.62, 0.45], "__S14__": [0.85, 0.55, 0.75], "__S15__": [0.55, 0.62, 0.48], "__S88__": [0.85, 0.35, 0.65], "__S99__": [0.85, 0.6, 0.7]}, "PK_DE_01": {"__S00__": [0.85, 0.72, 0.78], "__S1__": [0.55, 0.72, 0.6], "__S3__": [0.85, 0.8, 0.75], "__S4__": [0.75, 0.65, 0.55], "__S5__": [0.75, 0.6, 0.85], "__S6__": [0.9, 0.75, 0.85], "__S7__": [0.8, 0.55, 0.65], "__S8__": [0.7, 0.4, 0.55], "__S9__": [0.68, 0.45, 0.52], "__S11__": [0.9, 0.85, 0.82], "__S12__": [0.3, 0.2, 0.4], "__S13__": [0.62, 0.4, 0.55], "__S14__": [0.92, 0.88, 0.78], "__S15__": [0.35, 0.8, 0.6]}};
+const METRIC_IDX = {engagement:0, confidence:1, communication:2};
+const MIN_SHARED = 4;
+const GROUPS = {
+  DE:  {color:'#e4572e', name:'Eksperci'},
+  IT:  {color:'#37a6cf', name:'Informatycy'},
+  SSH: {color:'#a06bff', name:'Humaniści'}
+};
+const groupOf = id => (id.split('_')[1] || '?');
+
+function pearson(a, b){
+  const n=a.length; if(n<2) return null;
+  let ma=0,mb=0; for(let i=0;i<n;i++){ma+=a[i];mb+=b[i];} ma/=n; mb/=n;
+  let num=0,da=0,db=0;
+  for(let i=0;i<n;i++){const x=a[i]-ma,y=b[i]-mb;num+=x*y;da+=x*x;db+=y*y;}
+  if(da===0||db===0) return 0;
+  return num/Math.sqrt(da*db);
+}
+
+function correlateOneVsRest(targetId){
+  const t = PROFILES[targetId];
+  const tSlides = Object.keys(t);
+  const out = [];
+  for(const pid in PROFILES){
+    if(pid===targetId) continue;
+    const p = PROFILES[pid];
+    const shared = tSlides.filter(s => s in p);
+    if(shared.length < MIN_SHARED) continue;
+    const r = [0,1,2].map(i=>{
+      const av = shared.map(s=>t[s][i]);
+      const bv = shared.map(s=>p[s][i]);
+      return pearson(av,bv);
+    });
+    out.push({
+      id:pid, group:groupOf(pid), shared:shared.length,
+      r_eng:r[0], r_conf:r[1], r_comm:r[2],
+      mean:(r[0]+r[1]+r[2])/3
+    });
+  }
+  return out;
+}
+
+function render(targetId){
+  const res = correlateOneVsRest(targetId);
+
+  // ---- plot ----
+  const traces = [];
+  for(const g of ['DE','IT','SSH']){
+    const pts = res.filter(r=>r.group===g);
+    if(!pts.length) continue;
+    traces.push({
+      type:'scatter3d', mode:'markers', name:GROUPS[g].name,
+      x:pts.map(p=>p.r_eng), y:pts.map(p=>p.r_conf), z:pts.map(p=>p.r_comm),
+      marker:{size:6, color:GROUPS[g].color, opacity:.9, line:{width:.5,color:'#0d1219'}},
+      text:pts.map(p=>`<b>${p.id}</b><br>wspólnych slajdów: ${p.shared}<br>r_eng ${p.r_eng.toFixed(2)} · r_conf ${p.r_conf.toFixed(2)} · r_comm ${p.r_comm.toFixed(2)}`),
+      hovertemplate:'%{text}<extra></extra>'
+    });
+  }
+  traces.push({
+    type:'scatter3d', mode:'markers', name:targetId+' (cel)',
+    x:[1],y:[1],z:[1],
+    marker:{size:9,color:'#f4c20d',symbol:'diamond',line:{width:1.5,color:'#0d1219'}},
+    text:[`<b>${targetId}</b><br>uczestnik docelowy`], hovertemplate:'%{text}<extra></extra>'
+  });
+
+  const ax = t => ({
+    title:{text:t,font:{family:'IBM Plex Mono',size:11,color:'#8593a4'}},
+    range:[-1.05,1.05], zeroline:true, zerolinecolor:'#2a3848',
+    gridcolor:'#1c2735', showbackground:true, backgroundcolor:'#0f1620',
+    tickfont:{family:'IBM Plex Mono',size:10,color:'#5d6b7c'}
+  });
+
+  Plotly.react('plot', traces, {
+    paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)',
+    showlegend:false, margin:{l:0,r:0,t:6,b:0},
+    scene:{
+      xaxis:ax('r · engagement'), yaxis:ax('r · confidence'), zaxis:ax('r · communication'),
+      camera:{eye:{x:1.5,y:1.5,z:1.2}}
+    }
+  }, {displayModeBar:false, responsive:true});
+
+  // ---- caption ----
+  document.getElementById('capInfo').textContent =
+    `${res.length} par · oś: r engagement / confidence / communication`;
+
+  // ---- ranking ----
+  const ranked = [...res].sort((a,b)=>b.mean-a.mean).slice(0,8);
+  const rankEl = document.getElementById('rank');
+  rankEl.innerHTML = '';
+  ranked.forEach((r,i)=>{
+    const row = document.createElement('div'); row.className='rank-row';
+    const frac = Math.max(0, r.mean);              // bar only for positive mean
+    row.innerHTML = `
+      <span class="idx">${i+1}</span>
+      <span class="rank-id">${r.id}<span class="grp">${r.group}</span></span>
+      <span class="rank-val">${r.mean>=0?'+':''}${r.mean.toFixed(2)}</span>
+      <span class="bar"><i style="width:${(frac*100).toFixed(0)}%;background:${GROUPS[r.group].color}"></i></span>`;
+    rankEl.appendChild(row);
+  });
+
+  // ---- legend counts ----
+  const legEl = document.getElementById('legend'); legEl.innerHTML='';
+  for(const g of ['DE','IT','SSH']){
+    const n = res.filter(r=>r.group===g).length;
+    const row=document.createElement('div'); row.className='leg-row';
+    row.innerHTML = `<span class="dot" style="background:${GROUPS[g].color}"></span>
+      <span>${GROUPS[g].name}</span><span class="n">${n}</span>`;
+    legEl.appendChild(row);
+  }
+
+  // ---- selector meta ----
+  const tg = groupOf(targetId);
+  document.getElementById('selMeta').innerHTML =
+    `grupa <b>${GROUPS[tg]?.name||tg}</b> · <b>${Object.keys(PROFILES[targetId]).length}</b> slajdów w profilu`;
+}
+
+// init selector
+const sel = document.getElementById('target');
+Object.keys(PROFILES).sort().forEach(id=>{
+  const o=document.createElement('option'); o.value=id; o.textContent=id; sel.appendChild(o);
+});
+sel.value = PROFILES['MW_IT_06'] ? 'MW_IT_06' : Object.keys(PROFILES)[0];
+sel.addEventListener('change', e=>render(e.target.value));
+document.getElementById('nInfo').textContent = Object.keys(PROFILES).length;
+render(sel.value);
+</script>
+</body>
+</html>
