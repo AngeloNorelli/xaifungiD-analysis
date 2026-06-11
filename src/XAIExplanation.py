@@ -1,7 +1,7 @@
-from src.LocalLLM import LocalLLM
-from src.LocalLLM import FIELD_ALIASSES
-from collections import defaultdict
 import json
+from collections import defaultdict
+from src.LocalLLM import LocalLLM
+
 
 class XAIExplanation:
   def __init__(self, llm=None, participant_id=None, llm_responses=None, transcript=None):
@@ -33,11 +33,13 @@ class XAIExplanation:
         if participant_id not in data:
           return
         records = []
-        for slide_id, slide_records in data.items():
-          records.append({
-            "slide_id": slide_id,
-            "evaluation": slide_records
-          })
+        for p_id, record in data.items():
+          if p_id == participant_id:
+            for slide_id, slide_record in record.items():
+              records.append({
+                "slide_id": slide_id,
+                "evaluation": slide_record
+              })              
         self.llm_responses = records
     except Exception as e:
       print(f"Error reading LLM response: {e}")
@@ -55,23 +57,32 @@ class XAIExplanation:
   
   def _generate_explanation(self, transcript, data, system=None):
     prompt = """
-    Explain the difference between the two evaluations for the participant based on the following transcript and data.
-    Focus on the key factors that led to the change in evalutaion.
-    Provide insights into what might have caused the change and how it relates to the participant's behavior or responses.
-    Transcript: {transcript}
-    First Evaluation: {data1}
-    Second Evaluation: {data2}
+    Wytłumacz różnicę między dwoma ocenami dla uczestnika na podstawie poniższego transkryptu i danych.
+    Skup się na kluczowych czynnikach, które doprowadziły do zmiany oceny.
+    Podaj wgląd w to, co mogło spowodować zmianę i jak to się odnosi do zachowania lub odpowiedzi uczestnika.
+    Postara się nie rozpisywać, ale również sbróbuj podać konkretne elementy trnaskryptu, 
+    które mogą być istotne dla tej zmiany (max 3 zadania na kategorię).
+    Pierwsza Ocena: {data1}
+    Druga Ocena: {data2}
+    Transkrypt: {transcript}
     """
     prompt = prompt.format(transcript=transcript, data1=data[0], data2=data[1])
     if system:
       prompt = f"{system.strip()}\n\n{prompt}"
-    
-    response = self.llm._post(prompt)
-    return response
+
+    response = self.llm._query(prompt, system=system)
+    try:
+      response_data = json.loads(response)
+      return response_data.get("response", response)
+    except Exception:
+      return response
   
   def explain(self, llm_response_path, transcript_path, participant_id):
     self._extract_transcript(transcript_path, participant_id)
     self._extract_llm_responses_for_participant(llm_response_path, participant_id)
+    
+    if not self.llm_responses or not self.transcript:
+      return []
     
     explanations = []
     for i in range(len(self.llm_responses) - 1):

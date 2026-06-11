@@ -210,3 +210,7 @@ __marimo__/
 data/
 # Local transcripts
 transcripts/
+# XAI explanations
+xai_explanations/
+# Plot images
+plots/
