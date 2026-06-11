@@ -251,6 +251,30 @@ Klasa `XAIExplanation` analizuje **różnice w metrykach między kolejnymi slajd
 ]
 ```
 
+## Moduł Plot — `src/Plot.py`
+
+Skrypt do analizy korelacji dynamiki metryk jednego uczestnika z pozostałymi oraz generowania interaktywnego wykresu 3D (Plotly). Przydatny do znalezienia uczestników o podobnej dynamice (engagement / confidence / communication) i wizualnej inspekcji wyników.
+
+Główne funkcje:
+- `load_profiles(path)` — wczytuje `llm_responses.json` i buduje słownik {participant_id: {slide_id: (eng,conf,comm)}}; filtruje rekordy z brakującymi wartościami i uczestników z < MIN_SLIDES.
+- `correlate_one_vs_rest(profiles, target_id)` — liczy korelacje Pearsona (po wspólnych slajdach) dla każdej metryki; wymaga co najmniej MIN_SHARED wspólnych slajdów; zwraca listę rekordów z r_engagement, r_confidence, r_communication i mean_r.
+- `build_3d_figure(results, target_id)` — buduje i zwraca obiekt Plotly 3D z punktami pogrupowanymi wg grupy (DE/IT/SSH) oraz punktem docelowym w (1,1,1).
+
+Konfiguracja / parametry:
+- Stałe: `MIN_SLIDES`, `MIN_SHARED`, `METRICS`, `GROUP_COLORS`, `GROUP_NAMES` — łatwe do dostosowania w pliku.
+- Wymagane biblioteki: numpy, plotly.
+
+Uruchomienie:
+- Z katalogu projektu: cd src && python Plot.py [participant_id]
+  (domyślny participant_id = MW_IT_06)
+- Wyjście: plik HTML z wykresem zapisany jako `../correlation_3d.html`.
+
+Przykład:
+```
+cd src
+python Plot.py MW_IT_06
+```
+
 ---
 
 ## Pliki danych
