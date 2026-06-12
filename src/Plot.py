@@ -149,6 +149,6 @@ if __name__ == "__main__":
               f"(eng={r['r_engagement']:.2f}, conf={r['r_confidence']:.2f}, comm={r['r_communication']:.2f})")
 
     fig = build_3d_figure(results, target)
-    out = "../correlation_3d.html"
+    out = f"../correlation_3d_{target}.html"
     fig.write_html(out, include_plotlyjs="cdn")
     print(f"\nZapisano wykres: {out}")
